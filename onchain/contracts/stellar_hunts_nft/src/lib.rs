@@ -24,6 +24,7 @@ pub use stellar_hunts_types::Levels;
 #[derive(Clone)]
 pub enum NftDataKey {
     Admin,
+    PendingAdmin,
     Paused,
     Minters(Address),
     Badge(Address, Levels),
@@ -54,7 +55,7 @@ pub enum Error {
     InvalidBaseUri = 4,
     MetadataTooLarge = 5,
     NotInitialized = 6,
-    ContractPaused = 6,
+    ContractPaused = 7,
 }
 
 const MAX_BASE_URI_LEN: usize = 200;
@@ -111,6 +112,45 @@ impl StellarHuntsNft {
         env.events().publish(
             (Symbol::new(&env, "nft_initialized"),),
             (admin, game_contract),
+        );
+    }
+
+    pub fn propose_admin(env: Env, new_admin: Address) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&NftDataKey::Admin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        admin.require_auth();
+        env.storage()
+            .instance()
+            .set(&NftDataKey::PendingAdmin, &new_admin);
+        env.events().publish(
+            (Symbol::new(&env, "admin_transfer_proposed"),),
+            (admin, new_admin),
+        );
+    }
+
+    pub fn accept_admin(env: Env) {
+        let pending_admin: Address = env
+            .storage()
+            .instance()
+            .get(&NftDataKey::PendingAdmin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotAuthorized));
+        pending_admin.require_auth();
+
+        let previous_admin: Address = env
+            .storage()
+            .instance()
+            .get(&NftDataKey::Admin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        env.storage()
+            .instance()
+            .set(&NftDataKey::Admin, &pending_admin);
+        env.storage().instance().remove(&NftDataKey::PendingAdmin);
+        env.events().publish(
+            (Symbol::new(&env, "admin_transfer_accepted"),),
+            (previous_admin, pending_admin),
         );
     }
 

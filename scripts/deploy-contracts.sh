@@ -14,4 +14,11 @@ cd "${CDir}/onchain"
 echo "Building contracts in release mode..."
 cargo build --workspace --target wasm32-unknown-unknown --release
 
+# Admin handover is a two-transaction operation on each deployed contract.
+# The current admin proposes the new address, then the new address accepts:
+#   stellar contract invoke --id <contract-id> --source <old-admin> --network "${NETWORK}" -- propose_admin --new_admin <new-admin>
+#   stellar contract invoke --id <contract-id> --source <new-admin> --network "${NETWORK}" -- accept_admin
+# Run this sequence for both StellarHunts and StellarHuntsNft. Minter roles,
+# including the game's pre-approved NFT minter role, are preserved.
+
 echo "Contract deployment script executed successfully."

@@ -116,6 +116,31 @@ fn init_admin_auth_only(env: &Env) -> (Address, Address, StellarHuntsClient) {
     (admin, contract_address, client)
 }
 
+#[test]
+fn test_admin_handover_moves_control_to_new_admin() {
+    let env = Env::default();
+    let (old_admin, contract_address, client) = init_with_admin(&env);
+    let new_admin = new_admin(&env);
+
+    client.propose_admin(&new_admin);
+    client.accept_admin();
+    client.set_question_per_level(&7);
+
+    env.mock_auths(&[MockAuth {
+        address: &old_admin,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "set_question_per_level",
+            args: (&8u32,).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+    let old_admin_call = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.set_question_per_level(&8);
+    }));
+    assert!(old_admin_call.is_err());
+}
+
 // ---------------------------------------------------------------------
 // Positive: admin can set question per level
 // ---------------------------------------------------------------------

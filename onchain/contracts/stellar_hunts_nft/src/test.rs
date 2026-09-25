@@ -35,6 +35,34 @@ fn test_init_and_has_level_badge() {
 }
 
 #[test]
+fn test_admin_handover_preserves_minter_roles() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let old_admin = admin(&env);
+    let game = recipient(&env);
+    let new_admin = admin(&env);
+    let new_minter = recipient(&env);
+
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    let client = StellarHuntsNftClient::new(&env, &contract_id);
+    client.init(
+        &old_admin,
+        &game,
+        &String::from_str(&env, "ipfs://placeholder/"),
+        &String::from_str(&env, "StellarHuntsBadge"),
+        &String::from_str(&env, "SHB"),
+    );
+
+    assert!(client.has_minter_role(&game));
+    client.propose_admin(&new_admin);
+    client.accept_admin();
+    client.grant_minter_role(&new_minter);
+
+    assert!(client.has_minter_role(&game));
+    assert!(client.has_minter_role(&new_minter));
+}
+
+#[test]
 fn test_mint_via_game_contract_then_query() {
     let env = Env::default();
     env.mock_all_auths();
