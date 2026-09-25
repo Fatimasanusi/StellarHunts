@@ -9,6 +9,8 @@ Error::LevelImmutable = 11 is declared in onchain/contracts/stellar_hunts/src/li
 Proposal
 Confirm with grep -rn "LevelImmutable" onchain/contracts/ that nothing references it.
 Either remove the variant and renumber nothing (leave a gap to keep existing codes stable), or attach it to the places that currently rely on other errors for immutable-level operations, whichever the PR author justifies.
+Either remove the variant and renumber nothing (leave a gap to keep existing codes stable), or attach it to the places that currently rely on other errors for immutable-level operations, whichever the PR author justifies.
+Either remove the variant and renumber nothing (leave a gap to keep existing codes stable), or attach it to the places that currently rely on other errors for immutable-level operations, whichever the PR author justifies.
 Record the decision in the contract error table if one exists.
 Acceptance criteria
  No unused Error variant remains in stellar_hunts/src/lib.rs.
