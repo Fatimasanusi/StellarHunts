@@ -57,6 +57,7 @@ pub struct LevelProgress {
 #[derive(Clone)]
 pub enum DataKey {
     Admin,
+    PendingAdmin,
     NftContract,
     QuestionCount,
     QuestionPerLevel,
@@ -109,6 +110,7 @@ pub enum Error {
     AttemptTooSoon = 10,
     LevelImmutable = 11,
     ArithmeticOverflow = 12,
+    ContractPaused = 13,
 }
 
 // ---------------------------------------------------------------------
@@ -128,6 +130,45 @@ impl StellarHunts {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
         set_schema_version(&env);
+    }
+
+    pub fn propose_admin(env: Env, new_admin: Address) {
+        require_admin(&env);
+        let current_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        env.events().publish(
+            (Symbol::new(&env, "admin_transfer_proposed"),),
+            (current_admin, new_admin),
+        );
+    }
+
+    pub fn accept_admin(env: Env) {
+        let pending_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotAuthorized));
+        pending_admin.require_auth();
+
+        let previous_admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
+        env.storage()
+            .instance()
+            .set(&DataKey::Admin, &pending_admin);
+        env.storage().instance().remove(&DataKey::PendingAdmin);
+        env.events().publish(
+            (Symbol::new(&env, "admin_transfer_accepted"),),
+            (previous_admin, pending_admin),
+        );
     }
 
     // -----------------------------------------------------------------
