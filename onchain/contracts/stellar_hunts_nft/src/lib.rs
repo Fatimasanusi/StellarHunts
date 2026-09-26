@@ -239,7 +239,7 @@ impl StellarHuntsNft {
             .storage()
             .instance()
             .get(&NftDataKey::Admin)
-            .expect("admin not set");
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
         admin.require_auth();
 
         env.storage()
@@ -252,7 +252,7 @@ impl StellarHuntsNft {
             .storage()
             .instance()
             .get(&NftDataKey::Admin)
-            .expect("admin not set");
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotInitialized));
         admin.require_auth();
 
         env.storage()

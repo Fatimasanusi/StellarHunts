@@ -63,6 +63,63 @@ fn test_admin_handover_preserves_minter_roles() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_grant_minter_role_uninitialized_returns_contract_error() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    StellarHuntsNftClient::new(&env, &contract_id).grant_minter_role(&recipient(&env));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_revoke_minter_role_uninitialized_returns_contract_error() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    StellarHuntsNftClient::new(&env, &contract_id).revoke_minter_role(&recipient(&env));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_paused_mint_returns_contract_paused_code_7() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = admin(&env);
+    let game = recipient(&env);
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    let client = StellarHuntsNftClient::new(&env, &contract_id);
+    client.init(
+        &admin,
+        &game,
+        &String::from_str(&env, "ipfs://placeholder/"),
+        &String::from_str(&env, "StellarHuntsBadge"),
+        &String::from_str(&env, "SHB"),
+    );
+    client.pause();
+    client.mint_level_badge(&game, &recipient(&env), &crate::Levels::Easy);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1)")]
+fn test_unregistered_minter_returns_not_authorized_code_1() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = admin(&env);
+    let game = recipient(&env);
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    let client = StellarHuntsNftClient::new(&env, &contract_id);
+    client.init(
+        &admin,
+        &game,
+        &String::from_str(&env, "ipfs://placeholder/"),
+        &String::from_str(&env, "StellarHuntsBadge"),
+        &String::from_str(&env, "SHB"),
+    );
+    client.mint_level_badge(&recipient(&env), &recipient(&env), &crate::Levels::Easy);
+}
+
+#[test]
 fn test_mint_via_game_contract_then_query() {
     let env = Env::default();
     env.mock_all_auths();

@@ -272,6 +272,76 @@ fn test_submit_answer_incorrect_does_not_progress() {
     assert_eq!(new_level, crate::Levels::Easy);
 }
 
+#[test]
+fn test_submit_answer_requires_next_indexed_question() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, _contract_id, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&2u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+    client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+
+    let out_of_order = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &2u64, &b(&env, "A2"));
+    }));
+    assert!(out_of_order.is_err());
+    assert!(panic_text(&out_of_order).contains("Error(Contract, #14)"));
+    assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 0);
+
+    assert!(client.submit_answer(&player, &1u64, &b(&env, "A1")));
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    let duplicate = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A1"));
+    }));
+    assert!(duplicate.is_err());
+    assert!(panic_text(&duplicate).contains("Error(Contract, #14)"));
+    assert_eq!(client.get_player_level_progress(&player, &level).last_question_index, 1);
+    assert_eq!(client.get_player_level(&player), level);
+
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    assert!(client.submit_answer(&player, &2u64, &b(&env, "A2")));
+    assert_eq!(client.get_player_level(&player), crate::Levels::Medium);
+}
+
+#[test]
+fn test_retire_question_compacts_level_index_and_answer_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_sequence_number(100_000);
+    let (_admin, contract_id, client) = init_with_admin(&env);
+    let player = user(&env);
+    let level = crate::Levels::Easy;
+    client.set_question_per_level(&3u32);
+    client.add_question(&level, &b(&env, "Q1"), &b(&env, "A1"), &b(&env, "H1"));
+    client.add_question(&level, &b(&env, "Q2"), &b(&env, "A2"), &b(&env, "H2"));
+    client.add_question(&level, &b(&env, "Q3"), &b(&env, "A3"), &b(&env, "H3"));
+
+    client.retire_question(&1u64);
+    assert_eq!(client.get_question_in_level(&level, &0u32), b(&env, "Q2"));
+    assert_eq!(client.get_question_in_level(&level, &1u32), b(&env, "Q3"));
+    let count: u32 = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get(&crate::DataKey::QuestionPerLevelIndex(level.clone()))
+            .unwrap()
+    });
+    assert_eq!(count, 2);
+
+    // Compaction can invalidate stored player cursors; fresh progress starts
+    // at the new first question and retired question IDs can no longer pass.
+    let retired_answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.submit_answer(&player, &1u64, &b(&env, "A1"));
+    }));
+    assert!(retired_answer.is_err());
+    assert!(client.submit_answer(&player, &2u64, &b(&env, "A2")));
+    env.ledger().set_sequence_number(env.ledger().sequence() + 1);
+    assert!(client.submit_answer(&player, &3u64, &b(&env, "A3")));
+    assert_eq!(client.get_player_level(&player), crate::Levels::Medium);
+}
+
 // ---------------------------------------------------------------------
 // Hint request after answering a question
 // ---------------------------------------------------------------------
