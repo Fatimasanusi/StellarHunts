@@ -34,6 +34,69 @@ fn test_init_and_has_level_badge() {
     assert!(!client.has_level_badge(&r, &crate::Levels::Easy));
 }
 
+// ---------------------------------------------------------------------
+// Schema version (#453)
+// ---------------------------------------------------------------------
+
+#[test]
+fn test_schema_version() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = admin(&env);
+    let game = recipient(&env);
+
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    let client = StellarHuntsNftClient::new(&env, &contract_id);
+    client.init(
+        &admin,
+        &game,
+        &String::from_str(&env, "ipfs://placeholder/"),
+        &String::from_str(&env, "StellarHuntsBadge"),
+        &String::from_str(&env, "SHB"),
+    );
+
+    assert_eq!(client.get_schema_version(), crate::CURRENT_SCHEMA_VERSION);
+}
+
+/// A deployment registered but never initialized reports version 0.
+#[test]
+fn test_schema_version_zero_before_init() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    let client = StellarHuntsNftClient::new(&env, &contract_id);
+
+    assert_eq!(client.get_schema_version(), 0);
+}
+
+/// A legacy instance that never wrote the key reports 0, so an upgrade can
+/// detect pre-versioning state without requiring a re-`init`.
+#[test]
+fn test_legacy_instance_without_version_key_reports_zero() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = admin(&env);
+    let game = recipient(&env);
+
+    let contract_id = env.register_contract(None, StellarHuntsNft);
+    let client = StellarHuntsNftClient::new(&env, &contract_id);
+    client.init(
+        &admin,
+        &game,
+        &String::from_str(&env, "ipfs://placeholder/"),
+        &String::from_str(&env, "StellarHuntsBadge"),
+        &String::from_str(&env, "SHB"),
+    );
+
+    // Simulate a pre-versioning deployment by dropping the key.
+    env.as_contract(&contract_id, || {
+        env.storage()
+            .instance()
+            .remove(&crate::NftDataKey::SchemaVersion);
+    });
+
+    assert_eq!(client.get_schema_version(), 0);
+}
+
 #[test]
 fn test_admin_handover_preserves_minter_roles() {
     let env = Env::default();
