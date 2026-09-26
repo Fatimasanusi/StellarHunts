@@ -213,6 +213,70 @@ On-chain Soroban NFT badge minting.
 |--------|------|------|-------------|
 | POST | `/nft-claim/claim` | JWT | Trigger an NFT badge mint for a completed level |
 
+### `POST /nft-claim/claim`
+
+Requests a `mint_level_badge` invocation on the NFT contract. In live mode
+(`STELLAR_MODE=live`, the default) the backend builds, signs and submits a
+real Soroban transaction with the configured custodian key, then waits for
+ledger-level confirmation before reporting success.
+
+```json
+{
+  "userId": "GAWLOW7MZ4YGBLPSVKNKITVKXTT4DCKQS2YH7LQNFGFKAOGTUVJQVNXC",
+  "nftId": "badge-easy"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `userId` | yes | In live mode, the recipient's Stellar account id (`G...`). Other identifiers are rejected with `400`. |
+| `nftId` | yes | Must encode the on-chain level: the identifier has to end in `easy`, `medium`, `hard` or `master` (case-insensitive, separators allowed, e.g. `badge-easy`, `level_hard`). |
+
+**Success response — `200 OK`**
+
+```json
+{
+  "status": "confirmed",
+  "transactionId": "<64-char Soroban transaction hash>",
+  "userId": "GAWL...VNX",
+  "nftId": "badge-easy",
+  "contractId": "CCPL...BA5T",
+  "level": "easy",
+  "recipient": "GAWL...VNX",
+  "ledger": 101,
+  "createdAt": 1700000000
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `status` | `confirmed` — the transaction is included in a ledger **and** the invocation succeeded; `pending` — submitted, confirmation still outstanding. |
+| `transactionId` | Hash of the submitted transaction. Present in both states; use it to poll for confirmation. |
+| `ledger`, `createdAt` | Ledger sequence and close time of the confirming ledger (`confirmed` only). |
+
+A `transactionId` hash alone is **not** proof of a mint: only
+`status: "confirmed"` means the badge exists on-chain. Clients must treat
+`pending` as in-flight and continue polling.
+
+**Errors**
+
+| Status | Meaning |
+|--------|---------|
+| `400` | Permanent failure, never retried: unknown level in `nftId`, `userId` is not a Stellar account id, or the host/contract deterministically rejected the invocation (e.g. already minted, not a registered minter). |
+| `500` | Transient failure retried up to 3 times with exponential backoff, then given up: RPC transport errors, `TRY_AGAIN_LATER`, or server configuration problems (missing `SOROBAN_RPC_URL`, `SOROBAN_NFT_CONTRACT_ID` or `STELLAR_CUSTODIAN_SECRET_KEY`). |
+
+### Live-mode configuration
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `STELLAR_MODE` | no | `mock` (offline synthetic success) or `live` (default). `mock` is rejected when `NODE_ENV=production`. |
+| `SOROBAN_RPC_URL` | yes in live mode | Soroban RPC endpoint (https, allow-listed hosts — see issue #318). |
+| `SOROBAN_NFT_CONTRACT_ID` | yes in live mode | Contract id of the deployed NFT contract. |
+| `STELLAR_CUSTODIAN_SECRET_KEY` | yes in live mode | Secret key of the custodian account that signs mints. Must be a registered minter on the NFT contract. |
+| `STELLAR_NETWORK_PASSPHRASE` | no | Defaults to Stellar testnet. |
+| `SOROBAN_TX_FEE_STROOPS` | no | Transaction fee in stroops (default `100000`). |
+| `SOROBAN_CONFIRM_TIMEOUT_MS` / `SOROBAN_CONFIRM_POLL_INTERVAL_MS` | no | Confirmation polling deadline (default 60s) and cadence (default 2s). |
+
 ---
 
 ## Reward Shop
