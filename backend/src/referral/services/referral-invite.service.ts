@@ -56,6 +56,19 @@ export class ReferralInviteService {
     return savedInvite;
   }
 
+  async findById(inviteId: string): Promise<ReferralInvite> {
+    const invite = await this.inviteRepository.findOne({
+      where: { id: inviteId },
+      relations: ['referralCode'],
+    });
+
+    if (!invite) {
+      throw new NotFoundException('Invite not found');
+    }
+
+    return invite;
+  }
+
   async markAsRegistered(
     email: string,
     userId: string,

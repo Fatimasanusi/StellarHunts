@@ -310,8 +310,8 @@ On-chain Soroban NFT badge minting.
 | POST | `/referrals/invites` | JWT | Send a referral invite |
 | GET | `/referrals/stats` | JWT | Get referral statistics |
 | GET | `/referrals/history` | JWT | Get referral history |
-| POST | `/referrals/invites/:id/complete` | JWT | Mark a referral invite as completed |
-| POST | `/referrals/register` | Public | Register via referral code |
+| POST | `/referrals/invites/:id/complete` | JWT | Mark a referral invite as completed (referrer only) |
+| POST | `/referrals/register` | JWT | Register the authenticated user against a pending referral invite |
 
 ---
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import type { ReferralCodeService } from './referral-code.service';
 import type { ReferralInviteService } from './referral-invite.service';
 import type { ReferralBonusService } from './referral-bonus.service';
@@ -18,7 +18,21 @@ export class ReferralService {
     return this.referralCodeService.createReferralCode(userId, createDto);
   }
 
-  async sendInvite(createDto: CreateInviteDto) {
+  /**
+   * An invite is sent on behalf of a referral code, so the caller must own
+   * the code referenced by `createDto.referralCode`. Prevents any
+   * authenticated user from spending another user's invite quota.
+   */
+  async sendInvite(userId: string, createDto: CreateInviteDto) {
+    const code = await this.referralCodeService.findByCode(
+      createDto.referralCode,
+    );
+    if (code.userId !== userId) {
+      throw new ForbiddenException(
+        'You can only send invites with your own referral code',
+      );
+    }
+
     const invite = await this.inviteService.createInvite(createDto);
 
     // Here you would integrate with your email service
@@ -88,9 +102,20 @@ export class ReferralService {
     return invites;
   }
 
-  async processCompletedInvite(inviteId: string) {
-    const invite = await this.inviteService.markAsCompleted(inviteId);
-    return this.bonusService.allocateReferralBonus(invite);
+  /**
+   * Completing an invite allocates referral bonuses, so only the referrer
+   * (owner of the referral code the invite belongs to) may complete it.
+   */
+  async processCompletedInvite(inviteId: string, requesterId: string) {
+    const invite = await this.inviteService.findById(inviteId);
+    if (invite.referralCode.userId !== requesterId) {
+      throw new ForbiddenException(
+        'Only the referrer who sent this invite can complete it',
+      );
+    }
+
+    const completedInvite = await this.inviteService.markAsCompleted(inviteId);
+    return this.bonusService.allocateReferralBonus(completedInvite);
   }
 
   async cleanupExpiredInvites() {
