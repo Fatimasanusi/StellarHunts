@@ -49,6 +49,8 @@ Interactive docs: `http://localhost:3001/docs` (Swagger UI)
 - [Activity](#activity)
 - [Wallet](#wallet)
 - [Admin](#admin)
+- [Audit Logs](#audit-logs)
+- [Review Moderation](#review-moderation)
 - [Health Probes](#health-probes)
 
 ---
@@ -396,6 +398,37 @@ shutdown (#GracefulShutdown).
 | GET | `/admin/profile` | JWT + Admin | Get admin profile |
 | GET | `/admin/puzzles` | JWT + Admin | List all puzzles (admin) |
 | GET | `/admin/content` | JWT + Admin | List all content (admin) |
+
+---
+
+## Audit Logs
+
+Authoritative, filterable audit trail of administrative and moderation actions. Restricted to administrators.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/admin/audit-logs` | JWT + Admin | Query paginated audit log entries with filters (`actor`, `userId`, `targetType`, `targetId`, `action`, `startDate`, `endDate`, `page`, `limit`) |
+| GET | `/admin/audit-logs/moderation/:reviewId` | JWT + Admin | Get moderation decision audit trail for a review |
+| GET | `/admin/audit-logs/target/:targetType/:targetId` | JWT + Admin | Get audit trail for a specific target entity |
+| GET | `/admin/audit-logs/export` | JWT + Admin | Export audit logs as CSV |
+| DELETE | `/admin/audit-logs/older-than/:days` | JWT + Admin | Purge audit logs older than N days |
+
+---
+
+## Review Moderation
+
+Administrative review queue and decision moderation. Restricted to administrators.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/moderation/moderate` | JWT + Admin | Moderate a review (`approve`, `reject`, `flag`, etc.) |
+| POST | `/moderation/bulk` | JWT + Admin | Apply a moderation action to multiple reviews |
+| POST | `/moderation/auto` | JWT + Admin | Run rule-based auto-moderation |
+| GET | `/moderation/pending` | JWT + Admin | Get reviews pending moderation |
+| GET | `/moderation/flagged` | JWT + Admin | Get flagged reviews |
+| GET | `/moderation/stats` | JWT + Admin | Get moderation queue statistics |
+| GET | `/moderation/:reviewId/history` | JWT + Admin | Get moderation history for a review |
+| GET | `/moderation/:reviewId/decision-history` | JWT + Admin | Get moderation records correlated with immutable audit log trail |
 
 ---
 
