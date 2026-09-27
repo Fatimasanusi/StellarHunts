@@ -18,9 +18,10 @@ This document lists all error codes raised by the StellarHunts Soroban contracts
 | 10 | AttemptTooSoon | `submit_answer` | The caller is attempting to submit another answer too quickly (rate limit). |
 | 11 | LevelImmutable | - | Reserved for future use (currently defined but not raised). |
 | 12 | ArithmeticOverflow | `add_question`, `submit_answer`, `update_question` | An arithmetic operation would overflow. |
-| 6 | ContractPaused | `claim_level_completion_nft`, `submit_answer` | The contract is paused and cannot accept submissions. |
+| 13 | ContractPaused | `claim_level_completion_nft`, `submit_answer` | The contract is paused and cannot accept submissions. |
+| 14 | SchemaVersionMismatch | `migrate_schema` | The deployed schema version does not match the expected starting version for a migration. |
 
-**Note:** Code 6 is used for both `NotInitialized` and `ContractPaused`. This is a legacy duplication that should be avoided in new code.
+**Note:** `ContractPaused` is code 13 (`NotInitialized` is 6); earlier revisions of this document listed both as 6.
 
 ## stellar_hunts_nft Error Codes
 
