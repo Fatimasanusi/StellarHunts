@@ -89,6 +89,11 @@ part of the serialization. Two safe ways to evolve a stored struct:
   from existing state.
 
 ### `stellar_hunts_nft`
+- `CURRENT_SCHEMA_VERSION = 1`, written to `NftDataKey::SchemaVersion` at
+  `init` and readable via `get_schema_version()`. A missing key means `0`
+  (a deployment that predates versioning), so an operator can detect
+  pre-versioning state without re-running `init` (which would otherwise
+  fail with `AlreadyInitialized`) — see issue #453.
 - `Badge(Address, Levels)` is a presence flag; `BadgeData(Address, Levels)`
   stores `minted_at` + `minter`. Both keys are append-only in practice
   (badges are never unminted), so evolving `BadgeData` by adding fields is
@@ -198,3 +203,8 @@ guarantees:
 - `test_levels_discriminants_stable` — `Levels` numeric discriminants
   (Easy=1, Medium=2, Hard=3, Master=4) never change, protecting both stored
   state and event payloads.
+- `stellar_hunts_nft/src/test.rs`: `test_schema_version`,
+  `test_schema_version_zero_before_init`, and
+  `test_legacy_instance_without_version_key_reports_zero` lock the NFT
+  contract's version surface: `CURRENT_SCHEMA_VERSION` after `init`, `0`
+  before, and `0` for a legacy instance whose key was never written.

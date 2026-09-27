@@ -5,7 +5,10 @@ export default registerAs('appConfig', () => {
 
     return {
         environment,
-        apiVersion: process.env.API_VERSION,
+        // Version segment of the global route prefix (`api/<version>`).
+        // Kept in sync with `frontend/lib/api.js` (API_VERSION) and the
+        // generated API reference — see docs/api-conventions.md.
+        apiVersion: process.env.API_VERSION || 'v1',
         cors: {
             origin: process.env.FRONTEND_URL || 'http://localhost:3000',
             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

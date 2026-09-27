@@ -33,9 +33,9 @@ This document lists all error codes raised by the StellarHunts Soroban contracts
 | 4 | InvalidBaseUri | `init` | The provided base URI for metadata is invalid. |
 | 5 | MetadataTooLarge | `init` | The metadata exceeds the maximum allowed size. |
 | 6 | NotInitialized | `mint_level_badge` | The contract is not initialized. |
-| 6 | ContractPaused | `mint_level_badge` | The contract is paused and cannot mint badges. |
+| 7 | ContractPaused | `mint_level_badge` | The contract is paused and cannot mint badges. |
 
-**Note:** Code 6 is used for both `NotInitialized` and `ContractPaused` in the NFT contract as well. This duplication should be avoided in new code.
+**Note:** `NotInitialized` (#6) and `ContractPaused` (#7) are distinct in the NFT contract.
 
 ## Error Code Assignment Guidelines
 
@@ -49,7 +49,7 @@ When adding new error codes:
 
 ## Reserved/Legacy Codes
 
-- Code 6 in both contracts is currently used for two different errors (`NotInitialized` and `ContractPaused`). This is a legacy pattern that should not be repeated for new error codes.
+- Error codes are unique within each contract; the NFT contract's `ContractPaused` uses code 7.
 
 ## Off-Chain Client Integration
 
