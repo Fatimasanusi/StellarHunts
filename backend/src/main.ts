@@ -1,8 +1,10 @@
-import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { DOCS_ROUTE_EXCLUSIONS, buildApiPrefix } from './api-prefix';
+import { API_DOC_PATH, buildSwaggerConfig } from './swagger';
 import { securityHeadersConfig } from './security-headers';
 import { setupSwagger } from './swagger';
 
@@ -19,7 +21,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const configService = app.get<ConfigService>(ConfigService);
 
-  app.setGlobalPrefix('api', { exclude: ['docs', 'docs-json'] });
+  app.setGlobalPrefix(buildApiPrefix(configService.get<string>('appConfig.apiVersion')), {
+    exclude: DOCS_ROUTE_EXCLUSIONS,
+  });
   app.enableCors({
     origin: configService.get<string>('appConfig.cors.origin') ?? '*',
     methods: configService.get<string[]>('appConfig.cors.methods') ?? ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
