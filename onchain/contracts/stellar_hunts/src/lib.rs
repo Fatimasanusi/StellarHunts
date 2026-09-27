@@ -42,6 +42,10 @@ pub struct LevelProgress {
     pub level: Levels,
     // u8 is not a valid Soroban Val in soroban-sdk 22 — the smallest
     // native unsigned integer is `u32`.
+    /// Index of the next question in `QuestionsByLevel` that the player must
+    /// answer. Retiring or moving a question compacts that index; because
+    /// progress records are not enumerable, those administrative changes may
+    /// invalidate an existing cursor, which must then be reset by the player.
     pub last_question_index: u32,
     pub is_completed: bool,
     pub attempts: u32,
@@ -111,6 +115,7 @@ pub enum Error {
     LevelImmutable = 11,
     ArithmeticOverflow = 12,
     ContractPaused = 13,
+    WrongQuestion = 14,
 }
 
 // ---------------------------------------------------------------------
@@ -266,7 +271,11 @@ impl StellarHunts {
 
         let old_level = existing.level.clone();
 
-        if old_level != level {
+        let is_retired = env
+            .storage()
+            .persistent()
+            .has(&DataKey::RetiredQuestion(question_id));
+        if old_level != level && !is_retired {
             let per_level: u32 = env
                 .storage()
                 .instance()
@@ -304,39 +313,7 @@ impl StellarHunts {
                 &new_next_index,
             );
 
-            // `old_idx` counts the questions in the old level, so it is
-            // >= 1 whenever the question being moved exists there; a
-            // checked_sub keeps the underflow behavior explicit anyway.
-            let last_old_idx = old_idx
-                .checked_sub(1)
-                .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
-            for i in 0..old_idx {
-                let qid: u64 = env
-                    .storage()
-                    .persistent()
-                    .get(&DataKey::QuestionsByLevel(old_level.clone(), i))
-                    .unwrap_or(0u64);
-                if qid == question_id {
-                    for j in i..last_old_idx {
-                        let next_qid: u64 = env
-                            .storage()
-                            .persistent()
-                            .get(&DataKey::QuestionsByLevel(old_level.clone(), j + 1))
-                            .unwrap_or(0u64);
-                        env.storage()
-                            .persistent()
-                            .set(&DataKey::QuestionsByLevel(old_level.clone(), j), &next_qid);
-                    }
-                    env.storage()
-                        .persistent()
-                        .remove(&DataKey::QuestionsByLevel(old_level.clone(), last_old_idx));
-                    break;
-                }
-            }
-            env.storage().persistent().set(
-                &DataKey::QuestionPerLevelIndex(old_level.clone()),
-                &last_old_idx,
-            );
+            remove_question_from_level(&env, old_level.clone(), question_id);
         }
 
         let hashed: BytesN<32> = env.crypto().sha256(&answer).into();
@@ -372,9 +349,9 @@ impl StellarHunts {
         if !env.storage().persistent().has(&key) {
             panic_with_error!(&env, Error::QuestionNotFound);
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::RetiredQuestion(question_id), &true);
+        let question: Question = env.storage().persistent().get(&key).unwrap();
+        remove_question_from_level(&env, question.level.clone(), question_id);
+        env.storage().persistent().set(&DataKey::RetiredQuestion(question_id), &true);
         env.events()
             .publish((Symbol::new(&env, "question_retired"),), (question_id,));
     }
@@ -432,6 +409,21 @@ impl StellarHunts {
                     last_attempt_ledger: 0,
                 });
 
+        if lp.last_question_index == u32::MAX {
+            panic_with_error!(&env, Error::ArithmeticOverflow);
+        }
+
+        let expected_question_id: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::QuestionsByLevel(question.level.clone(), lp.last_question_index))
+            .unwrap_or(0u64);
+        if expected_question_id != question_id
+            || env.storage().persistent().has(&DataKey::RetiredQuestion(question_id))
+        {
+            panic_with_error!(&env, Error::WrongQuestion);
+        }
+
         let current_ledger = env.ledger().sequence();
         if lp.last_attempt_ledger == current_ledger {
             panic_with_error!(&env, Error::AttemptTooSoon);
@@ -450,12 +442,12 @@ impl StellarHunts {
                 .last_question_index
                 .checked_add(1)
                 .unwrap_or_else(|| panic_with_error!(&env, Error::ArithmeticOverflow));
-            let per_level: u32 = env
+            let active_questions: u32 = env
                 .storage()
-                .instance()
-                .get(&DataKey::QuestionPerLevel)
-                .unwrap_or(5u32);
-            if lp.last_question_index >= per_level {
+                .persistent()
+                .get(&DataKey::QuestionPerLevelIndex(question.level.clone()))
+                .unwrap_or(0u32);
+            if lp.last_question_index >= active_questions {
                 lp.is_completed = true;
                 let next = question.level.next();
                 let pp = PlayerProgress {
@@ -727,6 +719,45 @@ impl StellarHunts {
             (player, Levels::Easy),
         );
     }
+}
+
+/// Removes a question from its level index and compacts subsequent entries.
+/// Returns the new number of questions in that level.
+fn remove_question_from_level(env: &Env, level: Levels, question_id: u64) -> u32 {
+    let count: u32 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::QuestionPerLevelIndex(level.clone()))
+        .unwrap_or(0u32);
+    if count == 0 {
+        return 0;
+    }
+    let Some(index) = (0..count).find(|index| {
+        env.storage()
+            .persistent()
+            .get::<DataKey, u64>(&DataKey::QuestionsByLevel(level.clone(), *index))
+            == Some(question_id)
+    }) else {
+        return count;
+    };
+    for current in index..count - 1 {
+        let next: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::QuestionsByLevel(level.clone(), current + 1))
+            .unwrap_or(0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::QuestionsByLevel(level.clone(), current), &next);
+    }
+    let new_count = count - 1;
+    env.storage()
+        .persistent()
+        .remove(&DataKey::QuestionsByLevel(level.clone(), new_count));
+    env.storage()
+        .persistent()
+        .set(&DataKey::QuestionPerLevelIndex(level), &new_count);
+    new_count
 }
 
 // ---------------------------------------------------------------------
