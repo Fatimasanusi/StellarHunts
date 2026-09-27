@@ -183,9 +183,26 @@ override it).
 
 ## API Documentation
 
-Swagger documentation is available at `http://localhost:3001/api/docs`
-when the server is running. It provides interactive exploration of all
-endpoints, request schemas, and authentication requirements.
+When enabled, Swagger UI is served at `http://localhost:3001/docs` (the
+`/docs` route family is excluded from the `/api` global prefix). It
+provides interactive exploration of all endpoints, request schemas, and
+authentication requirements.
+
+The UI is governed by the `swagger.enabled` flag in
+`backend/config/app.config.ts` (see `backend/src/swagger.ts`):
+
+- **Development** (and any non-production environment) serves `/docs` by
+  default.
+- **Production / staging / test** keeps `/docs` disabled by default,
+  because the document exposes the full route inventory and DTO shapes.
+  Opt back in explicitly with `SWAGGER_ENABLED=true` when you need to
+  introspect a running instance:
+
+  ```env
+  SWAGGER_ENABLED=true
+  ```
+
+`npm run test:e2e -- swagger` covers both the enabled and disabled paths.
 
 ## Testing
 

@@ -1,10 +1,10 @@
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { securityHeadersConfig } from './security-headers';
+import { setupSwagger } from './swagger';
 
 /**
  * Hard limit (ms) we allow the graceful shutdown sequence to take before
@@ -29,13 +29,10 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('StellarHunts API')
-    .setDescription('StellarHunts backend REST API documentation.')
-    .setVersion(configService.get<string>('appConfig.apiVersion') ?? '1.0')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
-    .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerConfig));
+  // Respect `appConfig.swagger.enabled` (see backend/config/app.config.ts):
+  // the UI is mounted in development but stays off by default in
+  // production/staging/test unless `SWAGGER_ENABLED=true` is set explicitly.
+  setupSwagger(app, configService);
 
   const port = Number.parseInt(process.env.PORT ?? '3001', 10);
   await app.listen(port);
