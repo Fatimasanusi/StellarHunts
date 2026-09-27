@@ -1,58 +1,50 @@
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  DocumentBuilder,
-  OpenAPIObject,
-  SwaggerModule,
-} from '@nestjs/swagger';
-import { buildApiPrefix } from './api-prefix';
-
-/** Path the interactive Swagger UI is mounted at. */
-export const API_DOC_PATH = 'docs';
-
-/** Name of the bearer security scheme declared on the document. */
-export const BEARER_AUTH_SCHEME = 'bearer';
-
-/** `info.version` reported in the OpenAPI document. */
-export const API_DOCUMENT_VERSION = '1.0.0';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 /**
- * Builds the OpenAPI document metadata. Kept separate from the runtime so the
- * CI generator (`scripts/generate-openapi.ts`) and `src/main.ts` emit exactly
- * the same document (issue #555).
- *
- * The versioned prefix is exposed as the document's `servers[0].url` so the
- * generated reference advertises the real `/api/v1` surface rather than
- * listing bare controller paths.
+ * Builds the Swagger document metadata from runtime configuration.
  */
-export function buildSwaggerConfig(
-  configService?: ConfigService,
-): Omit<OpenAPIObject, 'paths'> {
-  const prefix = buildApiPrefix(configService?.get<string>('appConfig.apiVersion'));
-
+export function buildSwaggerConfig(configService: ConfigService) {
   return new DocumentBuilder()
     .setTitle('StellarHunts API')
-    .setDescription(
-      'StellarHunts backend REST API. Generated from the NestJS controllers; ' +
-        'route conventions are documented in docs/api-conventions.md.',
-    )
-    .setVersion(API_DOCUMENT_VERSION)
-    .addServer(`/${prefix}`, 'Versioned API prefix')
+    .setDescription('StellarHunts backend REST API documentation.')
+    .setVersion(configService.get<string>('appConfig.apiVersion') ?? '1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      BEARER_AUTH_SCHEME,
+      'bearer',
     )
     .build();
 }
 
 /**
- * Produces the OpenAPI document for a booted application using the shared
- * configuration. Requires route scanning to have happened (i.e. a created
- * `NestApplication`), but not an initialized or listening server.
+ * Registers the Swagger UI (and its `/docs-json` document endpoint) only
+ * when `appConfig.swagger.enabled` is true.
+ *
+ * `/docs` is a powerful introspection surface — it exposes the full route
+ * inventory and DTO shapes — so `backend/config/app.config.ts` disables it
+ * by default outside development and exposes `SWAGGER_ENABLED=true` as the
+ * explicit opt-in. Reading the flag here (instead of unconditionally
+ * calling `SwaggerModule.setup`) keeps the config flag authoritative (see
+ * issue #472). Returns whether the UI was mounted so callers and tests can
+ * assert the decision.
  */
-export function buildOpenApiDocument(
+export function setupSwagger(
   app: INestApplication,
-  configService?: ConfigService,
-): OpenAPIObject {
-  return SwaggerModule.createDocument(app, buildSwaggerConfig(configService));
+  configService: ConfigService,
+): boolean {
+  const enabled =
+    configService.get<boolean>('appConfig.swagger.enabled') === true;
+
+  if (!enabled) {
+    return false;
+  }
+
+  SwaggerModule.setup(
+    'docs',
+    app,
+    SwaggerModule.createDocument(app, buildSwaggerConfig(configService)),
+  );
+
+  return true;
 }
