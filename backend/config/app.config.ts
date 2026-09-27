@@ -8,6 +8,14 @@ export default registerAs('appConfig', () => {
     // without a .env file), so downstream checks always have a defined value.
     const environment = process.env.NODE_ENV || 'development';
 
+    // `/docs` is default-on in development only. Every other environment
+    // (production, staging, test) must opt back in explicitly via
+    // `SWAGGER_ENABLED=true`.
+    const swaggerDisabledByDefault =
+        environment === 'production' ||
+        environment === 'staging' ||
+        environment === 'test';
+
     return {
         environment,
 

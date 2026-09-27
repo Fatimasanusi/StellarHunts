@@ -115,9 +115,7 @@ pub enum Error {
     LevelImmutable = 11,
     ArithmeticOverflow = 12,
     ContractPaused = 13,
-    /// The question was retired by an admin and can no longer be answered,
-    /// hinted, or counted toward level completion (#447).
-    QuestionRetired = 14,
+    SchemaVersionMismatch = 14,
 }
 
 // ---------------------------------------------------------------------
@@ -732,6 +730,40 @@ impl StellarHunts {
 
     pub fn get_schema_version(e: Env) -> u32 {
         get_schema_version(&e)
+    }
+
+    /// Admin migration entry point driven by `scripts/contract-schema.sh`.
+    ///
+    /// The off-chain driver refuses to run unless the deployed version equals
+    /// the expected starting version; this contract-side check is a second
+    /// guard. Once the starting version is confirmed, the recorded schema
+    /// version is stamped to `CURRENT_SCHEMA_VERSION` so the operation is
+    /// idempotent and repeatable across batches. Struct-level data migrations
+    /// are tracked separately (see onchain/docs/storage-versioning.md).
+    ///
+    /// `batch_size` bounds the amount of work a single invocation performs;
+    /// it must be non-zero so the driver can never loop without progressing.
+    pub fn migrate_schema(env: Env, from_version: u32, batch_size: u32) -> u32 {
+        require_admin(&env);
+
+        if batch_size == 0 {
+            panic_with_error!(&env, Error::EmptyField);
+        }
+
+        let deployed = get_schema_version(&env);
+        if deployed != from_version {
+            panic_with_error!(&env, Error::SchemaVersionMismatch);
+        }
+
+        if deployed != CURRENT_SCHEMA_VERSION {
+            set_schema_version(&env);
+            env.events().publish(
+                (Symbol::new(&env, "schema_migrated"),),
+                (deployed, CURRENT_SCHEMA_VERSION),
+            );
+        }
+
+        CURRENT_SCHEMA_VERSION
     }
 
     // -----------------------------------------------------------------

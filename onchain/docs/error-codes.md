@@ -19,9 +19,9 @@ This document lists all error codes raised by the StellarHunts Soroban contracts
 | 11 | LevelImmutable | - | Reserved for future use (currently defined but not raised). |
 | 12 | ArithmeticOverflow | `add_question`, `submit_answer`, `update_question` | An arithmetic operation would overflow. |
 | 13 | ContractPaused | `claim_level_completion_nft`, `submit_answer` | The contract is paused and cannot accept submissions. |
-| 14 | QuestionRetired | `submit_answer`, `request_hint` | The question was retired by an admin and can no longer be answered or hinted. Use `is_question_retired(question_id)` to check ahead of time. |
+| 14 | SchemaVersionMismatch | `migrate_schema` | The deployed schema version does not match the expected starting version for a migration. |
 
-**Note:** `NotInitialized` (#6) and `ContractPaused` (#13) are distinct errors; callers should not treat #6 as a pause signal.
+**Note:** `ContractPaused` is code 13 (`NotInitialized` is 6); earlier revisions of this document listed both as 6.
 
 ## stellar_hunts_nft Error Codes
 
