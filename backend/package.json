@@ -23,6 +23,8 @@
     "openapi:generate": "npm run openapi:emit && npm run openapi:docs",
     "openapi:check": "npm run openapi:generate && git diff --exit-code -- ../docs/openapi.json ../docs/api.md",
     "error-logs": "nest start --entryFile error-logs-cli",
+    "audit:entities": "ts-node scripts/audit-entities.ts",
+    "audit:modules": "ts-node scripts/audit-modules.ts",
     "bench:mint": "ts-node scripts/bench-mint.ts",
     "bench:mint:json": "BENCH_JSON=1 ts-node scripts/bench-mint.ts"
   },
