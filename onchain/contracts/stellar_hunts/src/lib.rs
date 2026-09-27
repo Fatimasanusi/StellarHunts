@@ -115,7 +115,9 @@ pub enum Error {
     LevelImmutable = 11,
     ArithmeticOverflow = 12,
     ContractPaused = 13,
-    WrongQuestion = 14,
+    /// The question was retired by an admin and can no longer be answered,
+    /// hinted, or counted toward level completion (#447).
+    QuestionRetired = 14,
 }
 
 // ---------------------------------------------------------------------
@@ -373,7 +375,12 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn submit_answer(env: Env, caller: Address, question_id: u64, answer: Bytes) -> bool {
-        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+        {
             panic_with_error!(&env, Error::ContractPaused);
         }
         caller.require_auth();
@@ -393,6 +400,17 @@ impl StellarHunts {
             .get(&key)
             .ok_or(Error::QuestionNotFound)
             .unwrap();
+
+        // Retired questions are inert: reject the submission before any
+        // progress is written so a leaked/invalid question cannot be graded
+        // or advance the player (#447).
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::RetiredQuestion(question_id))
+        {
+            panic_with_error!(&env, Error::QuestionRetired);
+        }
 
         let lp_key = DataKey::PlayerLevelProgress(caller.clone(), question.level.clone());
         let mut lp: LevelProgress =
@@ -500,6 +518,14 @@ impl StellarHunts {
             .ok_or(Error::QuestionNotFound)
             .unwrap();
 
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::RetiredQuestion(question_id))
+        {
+            panic_with_error!(&env, Error::QuestionRetired);
+        }
+
         if pp.current_level != q.level {
             panic_with_error!(&env, Error::WrongLevel);
         }
@@ -531,7 +557,12 @@ impl StellarHunts {
     }
 
     pub fn claim_level_completion_nft(env: Env, caller: Address, level: Levels) {
-        if env.storage().instance().get(&DataKey::Paused).unwrap_or(false) {
+        if env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+        {
             panic_with_error!(&env, Error::ContractPaused);
         }
         caller.require_auth();
@@ -598,9 +629,11 @@ impl StellarHunts {
     // -----------------------------------------------------------------
 
     pub fn get_question(env: Env, question_id: u64) -> Question {
-        match env.storage()
+        match env
+            .storage()
             .persistent()
-            .get(&DataKey::Question(question_id)) {
+            .get(&DataKey::Question(question_id))
+        {
             Some(q) => q,
             None => panic_with_error!(&env, Error::QuestionNotFound),
         }
@@ -613,6 +646,17 @@ impl StellarHunts {
             .unwrap_or(0u32)
     }
 
+    /// Whether `question_id` was retired by an admin (#447).
+    ///
+    /// `get_question` still returns the question body so clients can show
+    /// what was retired, but the flag lets them grey it out and explains the
+    /// `QuestionRetired` error raised by `submit_answer` / `request_hint`.
+    pub fn is_question_retired(env: Env, question_id: u64) -> bool {
+        env.storage()
+            .persistent()
+            .has(&DataKey::RetiredQuestion(question_id))
+    }
+
     pub fn get_question_in_level(env: Env, level: Levels, index: u32) -> Bytes {
         let question_id: u64 = env
             .storage()
@@ -622,7 +666,8 @@ impl StellarHunts {
         let q: Question = match env
             .storage()
             .persistent()
-            .get(&DataKey::Question(question_id)) {
+            .get(&DataKey::Question(question_id))
+        {
             Some(q) => q,
             None => panic_with_error!(&env, Error::QuestionNotFound),
         };
@@ -679,7 +724,10 @@ impl StellarHunts {
     }
 
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
     }
 
     pub fn get_schema_version(e: Env) -> u32 {

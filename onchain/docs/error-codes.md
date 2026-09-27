@@ -19,8 +19,9 @@ This document lists all error codes raised by the StellarHunts Soroban contracts
 | 11 | LevelImmutable | - | Reserved for future use (currently defined but not raised). |
 | 12 | ArithmeticOverflow | `add_question`, `submit_answer`, `update_question` | An arithmetic operation would overflow. |
 | 13 | ContractPaused | `claim_level_completion_nft`, `submit_answer` | The contract is paused and cannot accept submissions. |
-| 14 | WrongQuestion | `submit_answer` | The submitted question is not the next active question in the level index. |
+| 14 | QuestionRetired | `submit_answer`, `request_hint` | The question was retired by an admin and can no longer be answered or hinted. Use `is_question_retired(question_id)` to check ahead of time. |
 
+**Note:** `NotInitialized` (#6) and `ContractPaused` (#13) are distinct errors; callers should not treat #6 as a pause signal.
 
 ## stellar_hunts_nft Error Codes
 
@@ -34,6 +35,7 @@ This document lists all error codes raised by the StellarHunts Soroban contracts
 | 6 | NotInitialized | `mint_level_badge` | The contract is not initialized. |
 | 7 | ContractPaused | `mint_level_badge` | The contract is paused and cannot mint badges. |
 
+**Note:** `NotInitialized` (#6) and `ContractPaused` (#7) are distinct in the NFT contract.
 
 ## Error Code Assignment Guidelines
 
