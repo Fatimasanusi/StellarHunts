@@ -49,7 +49,7 @@ When adding new error codes:
 
 ## Reserved/Legacy Codes
 
-- Code 6 in both contracts is currently used for two different errors (`NotInitialized` and `ContractPaused`). This is a legacy pattern that should not be repeated for new error codes.
+- Error codes are unique within each contract; the NFT contract's `ContractPaused` uses code 7.
 
 ## Off-Chain Client Integration
 
